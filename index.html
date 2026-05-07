@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Code — vCard + Logo</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex; align-items: center; justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white; border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px; max-width: 540px; width: 100%;
+        }
+        h1 { text-align: center; color: #333; margin-bottom: 6px; font-size: 24px; }
+        .subtitle { text-align: center; color: #aaa; margin-bottom: 24px; font-size: 13px; }
+
+        .tabs { display: flex; gap: 8px; margin-bottom: 24px; }
+        .tab {
+            flex: 1; padding: 10px; border: 2px solid #e0e0e0;
+            border-radius: 10px; background: white; cursor: pointer;
+            font-size: 13px; font-weight: 600; color: #aaa;
+            transition: all 0.2s; text-align: center;
+        }
+        .tab.active { border-color: #667eea; color: #667eea; background: rgba(102,126,234,0.05); }
+
+        .panel { display: none; }
+        .panel.active { display: block; }
+
+        .form-group { margin-bottom: 16px; }
+        .row { display: flex; gap: 12px; }
+        .row .form-group { flex: 1; }
+        label { display: block; margin-bottom: 6px; color: #444; font-weight: 600; font-size: 13px; }
+        input[type="text"], input[type="tel"], input[type="email"], input[type="url"], textarea {
+            width: 100%; padding: 10px 14px;
+            border: 2px solid #e0e0e0; border-radius: 10px;
+            font-size: 13px; font-family: inherit; transition: border 0.2s;
+            resize: none;
+        }
+        input:focus, textarea:focus { outline: none; border-color: #667eea; }
+
+        .section-title {
+            font-size: 11px; font-weight: 700; color: #aaa;
+            text-transform: uppercase; letter-spacing: 1px;
+            margin: 20px 0 12px;
+        }
+
+        .file-label {
+            display: block; padding: 10px 14px;
+            border: 2px dashed #667eea; border-radius: 10px;
+            cursor: pointer; text-align: center; color: #667eea;
+            font-size: 13px; transition: background 0.2s;
+        }
+        .file-label:hover { background: rgba(102,126,234,0.05); }
+        input[type="file"] { display: none; }
+        .file-info { font-size: 12px; color: #aaa; margin-top: 6px; text-align: center; }
+
+        .color-row { display: flex; gap: 12px; margin-bottom: 16px; }
+        .color-row .form-group { flex: 1; margin-bottom: 0; }
+        input[type="color"] {
+            width: 100%; height: 42px;
+            border: 2px solid #e0e0e0; border-radius: 10px;
+            cursor: pointer; padding: 3px;
+        }
+
+        .btn {
+            width: 100%; padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; border: none; border-radius: 10px;
+            font-size: 15px; font-weight: 600; cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s; margin-top: 8px;
+        }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(102,126,234,0.3); }
+
+        .result-section {
+            margin-top: 28px; padding-top: 28px;
+            border-top: 2px solid #f0f0f0; text-align: center; display: none;
+        }
+        #qrCanvas { border-radius: 12px; margin-bottom: 18px; max-width: 100%; }
+        .error { color: #e74c3c; font-size: 13px; margin-top: 8px; text-align: center; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>🎯 QR with vCard + Logo</h1>
+    <p class="subtitle">No ads. No link substitution. All local.</p>
+
+    <div class="tabs">
+        <button class="tab active" onclick="switchTab('url', this)">🔗 Link</button>
+        <button class="tab" onclick="switchTab('vcard', this)">👤 vCard (Contact)</button>
+    </div>
+
+    <!-- vCard panel -->
+    <div class="panel" id="panel-vcard">
+        <div class="section-title">Basic Info</div>
+        <div class="row">
+            <div class="form-group">
+                <label>First Name</label>
+                <input type="text" id="vc-first" placeholder="John">
+            </div>
+            <div class="form-group">
+                <label>Last Name</label>
+                <input type="text" id="vc-last" placeholder="Smith">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Job Title</label>
+            <input type="text" id="vc-title" placeholder="CEO, Manager...">
+        </div>
+        <div class="form-group">
+            <label>Company</label>
+            <input type="text" id="vc-org" placeholder="Company Name">
+        </div>
+
+        <div class="section-title">Contacts</div>
+        <div class="form-group">
+            <label>Phone (mobile)</label>
+            <input type="tel" id="vc-tel-cell" placeholder="+380501234567">
+        </div>
+        <div class="form-group">
+            <label>Phone (work)</label>
+            <input type="tel" id="vc-tel-work" placeholder="+380441234567">
+        </div>
+        <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="vc-email" placeholder="john@example.com">
+        </div>
+        <div class="form-group">
+            <label>Website</label>
+            <input type="url" id="vc-url" placeholder="https://example.com">
+        </div>
+        <div class="form-group">
+            <label>LinkedIn</label>
+            <input type="url" id="vc-linkedin" placeholder="https://linkedin.com/in/username">
+        </div>
+
+        <div class="section-title">Address</div>
+        <div class="form-group">
+            <label>Street, city, country</label>
+            <input type="text" id="vc-adr" placeholder="вул. Хрещатик 1, Київ, Україна">
+        </div>
+
+        <div class="section-title">Additional</div>
+        <div class="form-group">
+            <label>Note</label>
+            <textarea id="vc-note" rows="2" placeholder="Any text..."></textarea>
+        </div>
+    </div>
+
+    <!-- URL panel -->
+    <div class="panel active" id="panel-url">
+        <div class="form-group" style="margin-top:8px">
+            <label>Link</label>
+            <input type="text" id="url-input" placeholder="https://example.com">
+        </div>
+    </div>
+
+    <!-- Design -->
+    <div class="section-title">Design</div>
+    <div class="color-row">
+        <div class="form-group">
+            <label>QR Color</label>
+            <input type="color" id="colorPicker" value="#000000">
+        </div>
+        <div class="form-group">
+            <label>Background</label>
+            <input type="color" id="bgPicker" value="#ffffff">
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label>Logo in center (optional)</label>
+        <label for="logoInput" class="file-label" id="fileLabel">📸 Choose logo</label>
+        <input type="file" id="logoInput" accept="image/*">
+        <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:6px;">
+            <div class="file-info" id="fileName" style="margin-top:0">No logo</div>
+            <button id="removeLogoBtn" onclick="removeLogo()" style="display:none;background:none;border:none;color:#e74c3c;cursor:pointer;font-size:13px;font-weight:600;padding:0;">✕ Remove</button>
+        </div>
+    </div>
+
+    <button class="btn" onclick="generateQR()">✨ Generate QR Code</button>
+    <div id="errorMsg" class="error" style="display:none"></div>
+
+    <div class="result-section" id="resultSection">
+        <canvas id="qrCanvas"></canvas><br>
+        <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+            <button class="btn" style="width:auto;padding:12px 30px;" onclick="downloadPNG()">⬇️ PNG</button>
+            <button class="btn" style="width:auto;padding:12px 30px;background:linear-gradient(135deg,#11998e,#38ef7d);" onclick="downloadSVG()">⬇️ SVG</button>
+            <button class="btn" id="copySvgBtn" style="width:auto;padding:12px 30px;background:linear-gradient(135deg,#f7971e,#ffd200);color:#333;" onclick="copySVG()">📋 Copy SVG</button>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<script>
+let logoImg = null;
+let currentTab = 'url';
+
+function switchTab(tab, el) {
+    currentTab = tab;
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('panel-' + tab).classList.add('active');
+}
+
+document.getElementById('logoInput').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+        const img = new Image();
+        img.onload = () => {
+            logoImg = img; // only assign AFTER fully loaded (so naturalWidth/Height are correct)
+            document.getElementById('fileName').textContent = '✅ ' + file.name;
+            document.getElementById('fileLabel').textContent = '📸 ' + file.name;
+            document.getElementById('removeLogoBtn').style.display = 'inline';
+        };
+        img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+});
+
+function removeLogo() {
+    logoImg = null;
+    document.getElementById('logoInput').value = '';
+    document.getElementById('fileName').textContent = 'No logo';
+    document.getElementById('fileLabel').textContent = '📸 Choose logo';
+    document.getElementById('removeLogoBtn').style.display = 'none';
+}
+
+function buildVCard() {
+    const v = (id) => document.getElementById(id).value.trim();
+    const first = v('vc-first'), last = v('vc-last');
+    if (!first && !last) return null;
+
+    const lines = [
+        'BEGIN:VCARD',
+        'VERSION:3.0',
+        `N:${last};${first};;;`,
+        `FN:${first} ${last}`.trim(),
+    ];
+    if (v('vc-title'))    lines.push(`TITLE:${v('vc-title')}`);
+    if (v('vc-org'))      lines.push(`ORG:${v('vc-org')}`);
+    if (v('vc-tel-cell')) lines.push(`TEL;TYPE=CELL:${v('vc-tel-cell')}`);
+    if (v('vc-tel-work')) lines.push(`TEL;TYPE=WORK:${v('vc-tel-work')}`);
+    if (v('vc-email'))    lines.push(`EMAIL:${v('vc-email')}`);
+    if (v('vc-url'))      lines.push(`URL:${v('vc-url')}`);
+    if (v('vc-linkedin')) lines.push(`URL;type=LinkedIn:${v('vc-linkedin')}`);
+    if (v('vc-adr'))      lines.push(`ADR;TYPE=WORK:;;${v('vc-adr')};;;;`);
+    if (v('vc-note'))     lines.push(`NOTE:${v('vc-note')}`);
+    lines.push('END:VCARD');
+    return lines.join('\n');
+}
+
+function drawModule(ctx, col, row, cs, margin, grid, mc, color) {
+    const x = margin + col * cs;
+    const y = margin + row * cs;
+    const r = cs * 0.45;
+
+    function dark(c, r2) {
+        if (c < 0 || c >= mc || r2 < 0 || r2 >= mc) return false;
+        return grid[r2][c];
+    }
+
+    const top    = dark(col, row - 1);
+    const bottom = dark(col, row + 1);
+    const left   = dark(col - 1, row);
+    const right  = dark(col + 1, row);
+
+    const rtl = (top || left)    ? 0 : r;
+    const rtr = (top || right)   ? 0 : r;
+    const rbl = (bottom || left) ? 0 : r;
+    const rbr = (bottom || right)? 0 : r;
+
+    const W = cs, H = cs;
+    ctx.beginPath();
+    ctx.moveTo(x + rtl, y);
+    ctx.lineTo(x + W - rtr, y);
+    if (rtr > 0) ctx.arcTo(x+W, y,   x+W, y+rtr, rtr);
+    ctx.lineTo(x + W, y + H - rbr);
+    if (rbr > 0) ctx.arcTo(x+W, y+H, x+W-rbr, y+H, rbr);
+    ctx.lineTo(x + rbl, y + H);
+    if (rbl > 0) ctx.arcTo(x, y+H,   x, y+H-rbl, rbl);
+    ctx.lineTo(x, y + rtl);
+    if (rtl > 0) ctx.arcTo(x, y,     x+rtl, y, rtl);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+}
+
+function roundRectPath(ctx, x, y, w, h, r) {
+    r = Math.min(r, w/2, h/2);
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x+w, y,   x+w, y+h, r);
+    ctx.arcTo(x+w, y+h, x,   y+h, r);
+    ctx.arcTo(x,   y+h, x,   y,   r);
+    ctx.arcTo(x,   y,   x+r, y,   r);
+    ctx.closePath();
+}
+
+function drawFinder(ctx, col, row, cs, margin, color, bg) {
+    const x = margin + col * cs;
+    const y = margin + row * cs;
+    const outer = cs * 7;
+    const ro = cs * 1.2;
+    const stroke = cs; // thickness of the outer ring
+
+    // Outer ring — drawn as thick stroke, no fill (transparent inside)
+    ctx.beginPath();
+    roundRectPath(ctx, x + stroke/2, y + stroke/2, outer - stroke, outer - stroke, ro * 0.7);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = stroke;
+    ctx.stroke();
+
+    // Inner filled square
+    const inner = cs * 3;
+    ctx.beginPath();
+    roundRectPath(ctx, x + cs*2, y + cs*2, inner, inner, cs*0.6);
+    ctx.fillStyle = color;
+    ctx.fill();
+}
+
+function isFinderZone(row, col, mc) {
+    const s = 8;
+    if (row < s && col < s) return true;
+    if (row < s && col >= mc - s) return true;
+    if (row >= mc - s && col < s) return true;
+    return false;
+}
+
+function generateQR() {
+    const errEl = document.getElementById('errorMsg');
+    errEl.style.display = 'none';
+    document.getElementById('resultSection').style.display = 'none';
+
+    let data = '';
+    if (currentTab === 'vcard') {
+        data = buildVCard();
+        if (!data) {
+            errEl.textContent = '❌ Enter at least a first or last name';
+            errEl.style.display = 'block';
+            return;
+        }
+    } else {
+        data = document.getElementById('url-input').value.trim();
+        if (!data) {
+            errEl.textContent = '❌ Enter a link';
+            errEl.style.display = 'block';
+            return;
+        }
+    }
+
+    const color = document.getElementById('colorPicker').value;
+    const bg    = document.getElementById('bgPicker').value;
+
+    try {
+        const qr = qrcode(0, 'H');
+        qr.addData(data);
+        qr.make();
+
+        const mc = qr.getModuleCount();
+        const cs = 12;
+        const margin = cs * 2;
+        const size = mc * cs + margin * 2;
+
+        const canvas = document.getElementById('qrCanvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+
+        ctx.fillStyle = bg;
+        ctx.fillRect(0, 0, size, size);
+
+        const grid = [];
+        for (let r = 0; r < mc; r++) {
+            grid[r] = [];
+            for (let c = 0; c < mc; c++) grid[r][c] = qr.isDark(r, c);
+        }
+
+        // Маркери
+        [[0,0],[0,mc-7],[mc-7,0]].forEach(([fr,fc]) => {
+            drawFinder(ctx, fc, fr, cs, margin, color, bg);
+        });
+
+        // Дані
+        for (let r = 0; r < mc; r++) {
+            for (let c = 0; c < mc; c++) {
+                if (!grid[r][c] || isFinderZone(r, c, mc)) continue;
+                drawModule(ctx, c, r, cs, margin, grid, mc, color);
+            }
+        }
+
+        // Logo — square bg, preserve aspect ratio, high quality
+        if (logoImg) {
+            const boxSize = size * 0.18;
+            const pad = cs * 0.8;
+            const cx = size / 2, cy = size / 2;
+            const totalBox = boxSize + pad * 2;
+
+            // Square white background
+            ctx.save();
+            ctx.shadowColor = 'rgba(0,0,0,0.15)';
+            ctx.shadowBlur = 8;
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            roundRectPath(ctx, cx - totalBox/2, cy - totalBox/2, totalBox, totalBox, 12);
+            ctx.fill();
+            ctx.restore();
+
+            // Scale logo to fit inside boxSize preserving aspect ratio
+            const ratio = Math.min(boxSize / logoImg.naturalWidth, boxSize / logoImg.naturalHeight);
+            const lw = logoImg.naturalWidth * ratio;
+            const lh = logoImg.naturalHeight * ratio;
+
+            // High quality rendering
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(logoImg, cx - lw/2, cy - lh/2, lw, lh);
+        }
+
+        // Build SVG version
+        window._lastSVG = buildSVG(qr, mc, cs, margin, size, color, bg);
+
+        document.getElementById('resultSection').style.display = 'block';
+    } catch(e) {
+        errEl.textContent = '❌ Error: ' + e.message;
+        errEl.style.display = 'block';
+    }
+}
+
+function copySVG() {
+    if (!window._lastSVG) { alert('Generate the QR code first!'); return; }
+    const btn = document.getElementById('copySvgBtn');
+    navigator.clipboard.writeText(window._lastSVG).then(() => {
+        btn.textContent = '✅ Copied!';
+        setTimeout(() => { btn.textContent = '📋 Copy SVG'; }, 2000);
+    }).catch(() => {
+        // Fallback
+        const ta = document.createElement('textarea');
+        ta.value = window._lastSVG;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        btn.textContent = '✅ Copied!';
+        setTimeout(() => { btn.textContent = '📋 Copy SVG'; }, 2000);
+    });
+}
+
+function buildSVG(qr, mc, cs, margin, size, color, bg) {
+    const grid = [];
+    for (let r = 0; r < mc; r++) {
+        grid[r] = [];
+        for (let c = 0; c < mc; c++) grid[r][c] = qr.isDark(r, c);
+    }
+
+    let paths = '';
+
+    // Helper: rounded rect path for SVG
+    function svgRoundRect(x, y, w, h, r) {
+        r = Math.min(r, w/2, h/2);
+        return `M${x+r},${y} L${x+w-r},${y} Q${x+w},${y} ${x+w},${y+r} L${x+w},${y+h-r} Q${x+w},${y+h} ${x+w-r},${y+h} L${x+r},${y+h} Q${x},${y+h} ${x},${y+h-r} L${x},${y+r} Q${x},${y} ${x+r},${y} Z`;
+    }
+
+    // Finder patterns — stroke ring + inner square (no white fill = transparent background friendly)
+    const finders = [[0,0],[0,mc-7],[mc-7,0]];
+    for (const [fr,fc] of finders) {
+        const x = margin + fc*cs, y = margin + fr*cs;
+        const ro = cs*1.2;
+        const sw = cs; // stroke width
+        const half = sw/2;
+        // outer ring as stroke
+        paths += `<path d="${svgRoundRect(x+half,y+half,cs*7-sw,cs*7-sw,ro*0.7)}" fill="none" stroke="${color}" stroke-width="${sw}"/>`;
+        // inner filled square
+        paths += `<path d="${svgRoundRect(x+cs*2,y+cs*2,cs*3,cs*3,cs*0.6)}" fill="${color}"/>`;
+    }
+
+    // Data modules
+    for (let r = 0; r < mc; r++) {
+        for (let c = 0; c < mc; c++) {
+            if (!grid[r][c] || isFinderZone(r,c,mc)) continue;
+
+            const x = margin + c*cs, y2 = margin + r*cs;
+            const rad = cs*0.45;
+
+            const top    = (r>0 && grid[r-1][c]);
+            const bottom = (r<mc-1 && grid[r+1][c]);
+            const left   = (c>0 && grid[r][c-1]);
+            const right  = (c<mc-1 && grid[r][c+1]);
+
+            const rtl = (top||left)    ? 0 : rad;
+            const rtr = (top||right)   ? 0 : rad;
+            const rbl = (bottom||left) ? 0 : rad;
+            const rbr = (bottom||right)? 0 : rad;
+
+            const W = cs;
+            let d = `M${x+rtl},${y2} `;
+            d += `L${x+W-rtr},${y2} `;
+            if(rtr>0) d += `Q${x+W},${y2} ${x+W},${y2+rtr} `;
+            d += `L${x+W},${y2+W-rbr} `;
+            if(rbr>0) d += `Q${x+W},${y2+W} ${x+W-rbr},${y2+W} `;
+            d += `L${x+rbl},${y2+W} `;
+            if(rbl>0) d += `Q${x},${y2+W} ${x},${y2+W-rbl} `;
+            d += `L${x},${y2+rtl} `;
+            if(rtl>0) d += `Q${x},${y2} ${x+rtl},${y2} `;
+            d += 'Z';
+            paths += `<path d="${d}" fill="${color}"/>`;
+        }
+    }
+
+    // Logo in SVG — square bg, preserve aspect ratio
+    let logoSVG = '';
+    if (logoImg && logoImg.src) {
+        const boxSize = size * 0.18;
+        const pad = cs * 0.8;
+        const totalBox = boxSize + pad * 2;
+        const cx = size / 2, cy = size / 2;
+        const ratio = Math.min(boxSize / logoImg.naturalWidth, boxSize / logoImg.naturalHeight);
+        const lw = logoImg.naturalWidth * ratio;
+        const lh = logoImg.naturalHeight * ratio;
+        logoSVG = `<path d="${svgRoundRect(cx-totalBox/2, cy-totalBox/2, totalBox, totalBox, 12)}" fill="white"/>` +
+                  `<image href="${logoImg.src}" x="${cx-lw/2}" y="${cy-lh/2}" width="${lw}" height="${lh}" preserveAspectRatio="xMidYMid meet"/>`;
+    }
+
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+  <rect width="${size}" height="${size}" fill="${bg === '#ffffff' ? 'none' : bg}"/>
+  ${paths}
+  ${logoSVG}
+</svg>`;
+}
+
+function downloadPNG() {
+    const canvas = document.getElementById('qrCanvas');
+    const link = document.createElement('a');
+    link.href = canvas.toDataURL('image/png');
+    link.download = (currentTab === 'vcard' ? 'qr-vcard' : 'qr-link') + '.png';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function downloadSVG() {
+    if (!window._lastSVG) {
+        alert('Generate the QR code first!');
+        return;
+    }
+    const blob = new Blob([window._lastSVG], {type: 'image/svg+xml'});
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = (currentTab === 'vcard' ? 'qr-vcard' : 'qr-link') + '.svg';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+}
+</script>
+</body>
+</html>
